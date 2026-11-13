@@ -1,4 +1,3 @@
-
 const json = (data, status = 200) =>
   Response.json(data, {
     status,
@@ -8,7 +7,7 @@ const json = (data, status = 200) =>
     }
   });
 
-function safeEqual(a, b) {
+function safeEqual(a, b) 
   const x = new TextEncoder().encode(a);
   const y = new TextEncoder().encode(b);
   let diff = x.length ^ y.length;
@@ -20,29 +19,26 @@ function safeEqual(a, b) {
   return diff === 0;
 }
 
+function clean(value, max = 150) {
+  return typeof value === "string" ? value.trim().slice(0, max) : "";
+}
+
 function isAdmin(request, env) {
   const secret = env.ADMIN_SECRET;
   const supplied = request.headers.get("X-Admin-Secret") || "";
 
   return (
     typeof secret === "string" &&
-    secret.length >= 6 &&
+    secret.length >= 20 &&
     safeEqual(supplied, secret)
   );
 }
 
-function clean(value, max = 150) {
-  return typeof value === "string"
-    ? value.trim().slice(0, max)
-    : "";
-}
-
 async function api(request, env, path) {
   if (!env.DB) {
-    return json({ error: "Database D1 tidak disambungkan" }, 500);
+    return json({ error: "Database D1 belum disambungkan" }, 500);
   }
 
-  // Public health check
   if (path === "/api/health" && request.method === "GET") {
     try {
       const result = await env.DB.prepare(
@@ -55,34 +51,27 @@ async function api(request, env, path) {
         total_workers: result?.total ?? 0
       });
     } catch {
-      return json({ error: "Database tidak dapat dibaca" }, 500);
+      return json({ error: "Jadual workers tidak dapat dibaca" }, 500);
     }
   }
 
-  // Verify admin credentials
+  if (path === "/api/admin/verify" && request.method === "POST") {
+    if (
+      typeof env.ADMIN_SECRET !== "string" ||
+      env.ADMIN_SECRET.length < 20
+    ) {
+      return json({
+        error: "ADMIN_SECRET tiada atau kurang daripada 20 aksara"
+      }, 503);
+    }
 
-if (path === "/api/admin/verify" && request.method === "POST") {
-  const configured = typeof env.ADMIN_SECRET === "string";
-  const supplied = request.headers.get("X-Admin-Secret") || "";
+    if (!isAdmin(request, env)) {
+      return json({ error: "Kunci admin tidak sepadan" }, 401);
+    }
 
-  if (!configured || env.ADMIN_SECRET.length < 20) {
-    return json({
-      error: "ADMIN_SECRET tidak tersedia atau tidak sah dalam Worker",
-      code: "SECRET_CONFIG_ERROR"
-    }, 503);
+    return json({ ok: true, message: "Log masuk berjaya" });
   }
 
-  if (!safeEqual(supplied, env.ADMIN_SECRET)) {
-    return json({
-      error: "Kunci yang dimasukkan tidak sepadan dengan Secret Cloudflare",
-      code: "SECRET_MISMATCH"
-    }, 401);
-  }
-
-  return json({ ok: true, message: "Login berjaya" });
-  }
-
-  // All remaining admin APIs require authentication
   if (!isAdmin(request, env)) {
     return json({ error: "Akses admin tidak dibenarkan" }, 401);
   }
@@ -91,6 +80,7 @@ if (path === "/api/admin/verify" && request.method === "POST") {
     const result = await env.DB.prepare(
       "SELECT id, full_name, active, created_at FROM workers ORDER BY id DESC"
     ).all();
+
     return json(result.results);
   }
 
@@ -110,7 +100,7 @@ if (path === "/api/admin/verify" && request.method === "POST") {
 
       return json({ ok: true }, 201);
     } catch {
-      return json({ error: "ID pekerja sudah wujud atau gagal disimpan" }, 409);
+      return json({ error: "ID pekerja mungkin sudah wujud" }, 409);
     }
   }
 
@@ -118,17 +108,18 @@ if (path === "/api/admin/verify" && request.method === "POST") {
     const result = await env.DB.prepare(
       "SELECT id, event_name, event_date, location FROM events ORDER BY event_date DESC, id DESC"
     ).all();
+
     return json(result.results);
   }
 
   if (path === "/api/admin/events" && request.method === "POST") {
     const body = await request.json().catch(() => ({}));
-    const name = clean(body.event_name);
+    const name = clean(body.event_name, 150);
     const date = clean(body.event_date, 10);
-    const location = clean(body.location);
+    const location = clean(body.location, 150);
 
     if (!name || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      return json({ error: "Nama atau tarikh event tidak sah" }, 400);
+      return json({ error: "Nama event atau tarikh tidak sah" }, 400);
     }
 
     await env.DB.prepare(
@@ -147,7 +138,7 @@ if (path === "/api/admin/verify" && request.method === "POST") {
       !Number.isSafeInteger(eventId) || eventId < 1 ||
       !Number.isSafeInteger(workerId) || workerId < 1
     ) {
-      return json({ error: "ID event atau pekerja tidak sah" }, 400);
+      return json({ error: "Event atau pekerja tidak sah" }, 400);
     }
 
     const event = await env.DB.prepare(
@@ -195,32 +186,31 @@ const page = `<!DOCTYPE html>
 <style>
 *{box-sizing:border-box}
 body{margin:0;background:#f1f5f9;color:#182b49;font-family:Arial,sans-serif}
-header{background:#203e78;color:white;padding:24px 18px;text-align:center}
-header h1{font-size:25px;margin:0 0 8px}
-main{max-width:650px;margin:auto;padding:16px}
-.card{background:white;border-radius:17px;padding:22px;margin:15px 0;box-shadow:0 5px 20px #0000000c}
-h2{font-size:20px;margin-top:0}
-label{display:block;font-size:14px;font-weight:bold;margin:13px 0 6px}
+header{background:#203e78;color:white;padding:22px 16px;text-align:center}
+main{max-width:680px;margin:auto;padding:16px}
+.card{background:white;border-radius:16px;padding:20px;margin:14px 0;box-shadow:0 4px 18px #00000010}
+h1{font-size:24px;margin:0 0 6px}
+h2{font-size:19px;margin:0 0 12px}
+label{display:block;font-weight:bold;margin:12px 0 6px}
 input,select{width:100%;padding:13px;border:1px solid #cbd5e1;border-radius:9px;font-size:16px;background:white}
-button{background:#203e78;color:white;border:0;padding:14px;border-radius:10px;font-size:16px;font-weight:bold;width:100%;margin-top:14px}
+button{width:100%;padding:13px;margin-top:12px;border:0;border-radius:9px;background:#203e78;color:white;font-size:16px;font-weight:bold}
 button.secondary{background:#e5eaf2;color:#203e78}
 small,.muted{color:#64748b}
-.item{padding:12px 0;border-bottom:1px solid #e5e7eb;overflow-wrap:anywhere}
-.item:last-child{border:0}
+.item{padding:10px 0;border-bottom:1px solid #e5e7eb;overflow-wrap:anywhere}
+.notice{padding:10px;border-radius:8px;background:#eef2ff;margin-top:10px;overflow-wrap:anywhere}
 .hidden{display:none}
-.notice{padding:12px;border-radius:9px;background:#eef2ff;margin-top:12px;overflow-wrap:anywhere}
 </style>
 </head>
 <body>
 <header>
 <h1>ES Staff Attendance</h1>
-<div>ES Mega Event · Dashboard Admin</div>
+<div>Dashboard Admin · ES Mega Event</div>
 </header>
 <main>
 <section id="login" class="card">
-<h2>🔐 Log Masuk Admin</h2>
-<p class="muted">Masukkan kunci admin yang disimpan di Cloudflare.</p>
-<label>Kunci Admin</label>
+<h2>Log Masuk Admin</h2>
+<p class="muted">Masukkan ADMIN_SECRET Cloudflare.</p>
+<label>Kunci admin</label>
 <input id="secret" type="password" autocomplete="off">
 <button onclick="login()">Log Masuk</button>
 <div id="loginMsg" class="notice" role="status"></div>
@@ -228,57 +218,58 @@ small,.muted{color:#64748b}
 
 <div id="dashboard" class="hidden">
 <section class="card">
-<h2>👋 Dashboard Admin</h2>
-<button class="secondary" onclick="loadAll()">Muat Semula Data</button>
-<button class="secondary" onclick="logout()">Log Keluar</button>
+<h2>Dashboard</h2>
 <div id="summary" class="notice"></div>
+<button class="secondary" onclick="loadAll()">Muat semula</button>
+<button class="secondary" onclick="logout()">Log keluar</button>
 </section>
 
 <section class="card">
-<h2>👷 Daftar Pekerja</h2>
-<label>Nama Penuh</label>
+<h2>Daftar pekerja</h2>
+<label>Nama penuh</label>
 <input id="workerName" placeholder="Nama pekerja">
-<label>ID Pekerja Sementara</label>
+<label>ID pekerja</label>
 <input id="workerCode" placeholder="Contoh STAFF001">
-<small>Jangan masukkan nombor IC sebenar.</small>
-<button onclick="addWorker()">Simpan Pekerja</button>
+<small>Jangan masukkan nombor IC sebenar di ruangan ini.</small>
+<button onclick="addWorker()">Simpan pekerja</button>
 <div id="workers"></div>
 </section>
 
 <section class="card">
-<h2>📅 Cipta Event</h2>
-<label>Nama Event</label>
-<input id="eventName" placeholder="Contoh Wedding Kenangan Glass Hall">
-<label>Tarikh Event</label>
+<h2>Cipta event</h2>
+<label>Nama event</label>
+<input id="eventName" placeholder="Nama event">
+<label>Tarikh</label>
 <input id="eventDate" type="date">
 <label>Lokasi</label>
 <input id="eventLocation" placeholder="Lokasi event">
-<button onclick="addEvent()">Simpan Event</button>
+<button onclick="addEvent()">Simpan event</button>
 <div id="events"></div>
 </section>
 
 <section class="card">
-<h2>📋 Tetapkan Pekerja Bertugas</h2>
-<label>Pilih Event</label>
+<h2>Tetapkan pekerja untuk event</h2>
+<label>Event</label>
 <select id="assignEvent"></select>
-<label>Pilih Pekerja</label>
+<label>Pekerja</label>
 <select id="assignWorker"></select>
-<button onclick="assignWorker()">Tetapkan Pekerja</button>
+<button onclick="assignWorker()">Tetapkan pekerja</button>
 </section>
 
 <section class="card">
-<h2>📊 Laporan Kehadiran</h2>
+<h2>Laporan kehadiran</h2>
 <div id="attendance"></div>
 </section>
 
 <div id="message" class="notice" role="status"></div>
 </div>
 </main>
+
 <script>
 let adminSecret = "";
 
-function showMessage(message) {
-  document.getElementById("message").textContent = message;
+function showMessage(text) {
+  document.getElementById("message").textContent = text;
 }
 
 async function callApi(path, method = "GET", data) {
@@ -308,9 +299,9 @@ async function login() {
   try {
     await callApi("/api/admin/verify", "POST");
     document.getElementById("secret").value = "";
-    msg.textContent = "";
     document.getElementById("login").classList.add("hidden");
     document.getElementById("dashboard").classList.remove("hidden");
+    msg.textContent = "";
     await loadAll();
   } catch (error) {
     adminSecret = "";
@@ -325,32 +316,32 @@ function logout() {
 }
 
 function renderItems(id, items, format) {
-  const el = document.getElementById(id);
-  el.replaceChildren();
+  const element = document.getElementById(id);
+  element.replaceChildren();
 
   if (!items.length) {
-    el.textContent = "Tiada rekod lagi.";
+    element.textContent = "Tiada rekod lagi.";
     return;
   }
 
-  items.forEach(item => {
-    const div = document.createElement("div");
-    div.className = "item";
-    div.textContent = format(item);
-    el.appendChild(div);
-  });
+  for (const item of items) {
+    const row = document.createElement("div");
+    row.className = "item";
+    row.textContent = format(item);
+    element.appendChild(row);
+  }
 }
 
-function fillSelect(id, items, label) {
+function fillSelect(id, items, format) {
   const select = document.getElementById(id);
   select.replaceChildren();
 
-  items.forEach(item => {
+  for (const item of items) {
     const option = document.createElement("option");
     option.value = item.id;
-    option.textContent = label(item);
+    option.textContent = format(item);
     select.appendChild(option);
-  });
+  }
 }
 
 async function loadAll() {
@@ -366,24 +357,29 @@ async function loadAll() {
       events.length + " event · " +
       attendance.length + " rekod kehadiran";
 
-    renderItems("workers", workers,
-      w => "#" + w.id + " · " + w.full_name +
-      (w.active ? " · Aktif" : " · Tidak aktif"));
+    renderItems("workers", workers, w =>
+      "#" + w.id + " · " + w.full_name +
+      (w.active ? " · Aktif" : " · Tidak aktif")
+    );
 
-    renderItems("events", events,
-      e => "#" + e.id + " · " + e.event_date +
-      " · " + e.event_name + " · " + (e.location || "-"));
+    renderItems("events", events, e =>
+      "#" + e.id + " · " + e.event_date + " · " +
+      e.event_name + " · " + (e.location || "-")
+    );
 
-    renderItems("attendance", attendance,
-      a => a.full_name + " · " + a.event_name +
+    renderItems("attendance", attendance, a =>
+      a.full_name + " · " + a.event_name +
       " · Masuk: " + (a.check_in || "-") +
-      " · Keluar: " + (a.check_out || "-"));
+      " · Keluar: " + (a.check_out || "-")
+    );
 
-    fillSelect("assignEvent", events,
-      e => e.event_date + " · " + e.event_name);
+    fillSelect("assignEvent", events, e =>
+      e.event_date + " · " + e.event_name
+    );
 
-    fillSelect("assignWorker", workers.filter(w => w.active),
-      w => w.full_name);
+    fillSelect("assignWorker", workers.filter(w => w.active), w =>
+      w.full_name
+    );
   } catch (error) {
     showMessage(error.message);
   }
@@ -398,10 +394,10 @@ async function addWorker() {
 
     document.getElementById("workerName").value = "";
     document.getElementById("workerCode").value = "";
-    showMessage("✅ Pekerja berjaya didaftarkan");
+    showMessage("Pekerja berjaya didaftarkan.");
     await loadAll();
   } catch (error) {
-    showMessage("❌ " + error.message);
+    showMessage(error.message);
   }
 }
 
@@ -413,10 +409,10 @@ async function addEvent() {
       location: document.getElementById("eventLocation").value
     });
 
-    showMessage("✅ Event berjaya dicipta");
+    showMessage("Event berjaya dicipta.");
     await loadAll();
   } catch (error) {
-    showMessage("❌ " + error.message);
+    showMessage(error.message);
   }
 }
 
@@ -427,9 +423,9 @@ async function assignWorker() {
       worker_id: Number(document.getElementById("assignWorker").value)
     });
 
-    showMessage("✅ Pekerja berjaya ditetapkan untuk event");
+    showMessage("Pekerja berjaya ditetapkan.");
   } catch (error) {
-    showMessage("❌ " + error.message);
+    showMessage(error.message);
   }
 }
 </script>
