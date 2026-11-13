@@ -2,7 +2,7 @@
 {
   "name": "es-staff-attendance",
   "main": "src/index.js",
-  "compatibility_date": "2026-11-14",
+  "compatibility_date": "2026-11-13",
   "d1_databases": [
     {
       "binding": "DB",
