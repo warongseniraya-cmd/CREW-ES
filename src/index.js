@@ -7,7 +7,7 @@ const json = (data, status = 200) =>
     }
   });
 
-function safeEqual(a, b) 
+function safeEqual(a, b) {
   const x = new TextEncoder().encode(a);
   const y = new TextEncoder().encode(b);
   let diff = x.length ^ y.length;
@@ -60,9 +60,7 @@ async function api(request, env, path) {
       typeof env.ADMIN_SECRET !== "string" ||
       env.ADMIN_SECRET.length < 20
     ) {
-      return json({
-        error: "ADMIN_SECRET tiada atau kurang daripada 20 aksara"
-      }, 503);
+      return json({ error: "ADMIN_SECRET tiada atau tidak sah" }, 503);
     }
 
     if (!isAdmin(request, env)) {
