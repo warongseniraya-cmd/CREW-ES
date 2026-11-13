@@ -1,0 +1,13 @@
+
+{
+  "name": "es-staff-attendance",
+  "main": "src/index.js",
+  "compatibility_date": "2026-11-14",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "es-staff-db",
+      "database_id": "1b7a1356-9275-4112-8be2-a803a1d9af67"
+    }
+  ]
+}
